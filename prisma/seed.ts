@@ -18,15 +18,14 @@ const ROLES: Array<{ name: string; permissions: Record<string, string[]> }> =
     },
     {
       name: 'admin',
+      // Manages products, categories, inventory, and orders — staff/user
+      // management and the audit log stay super_admin-only per the TRD.
       permissions: {
-        users: ['create', 'read', 'update'],
-        roles: ['read'],
         categories: ['create', 'read', 'update', 'delete'],
         products: ['create', 'read', 'update', 'delete'],
         inventory: ['read', 'update'],
         orders: ['read', 'update'],
         payments: ['read'],
-        'audit-logs': ['read'],
       },
     },
     {
@@ -34,16 +33,16 @@ const ROLES: Array<{ name: string; permissions: Record<string, string[]> }> =
       permissions: {
         products: ['read'],
         inventory: ['create', 'read', 'update'],
-        'audit-logs': ['read'],
       },
     },
     {
       name: 'support',
+      // View-only: orders/customers, no product/inventory edit rights.
       permissions: {
         users: ['read'],
-        orders: ['read', 'update'],
+        orders: ['read'],
         payments: ['read'],
-        'custom-designs': ['read', 'update'],
+        'custom-designs': ['read'],
       },
     },
   ];
