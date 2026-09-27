@@ -22,10 +22,15 @@ import { BulkUpdateStatusDto } from './dto/bulk-update-status.dto';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { CreateProductImageDto } from './dto/create-product-image.dto';
+import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
+import { StorageService } from './storage.service';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly storageService: StorageService,
+  ) {}
 
   @Permissions('products:read')
   @Get()
@@ -101,6 +106,15 @@ export class ProductsController {
     @Param('variantId') variantId: string,
   ) {
     return this.productsService.removeVariant(productId, variantId);
+  }
+
+  @Permissions('products:update')
+  @Post(':id/images/upload-url')
+  createUploadUrl(
+    @Param('id') productId: string,
+    @Body() dto: CreateUploadUrlDto,
+  ) {
+    return this.storageService.createUploadUrl(productId, dto);
   }
 
   @Permissions('products:update')

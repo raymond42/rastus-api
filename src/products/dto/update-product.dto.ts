@@ -1,4 +1,4 @@
-import { OmitType, PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType } from '@nestjs/swagger';
 import { CreateProductDto } from './create-product.dto';
 
 // Top-level field updates only — variants and images have their own
