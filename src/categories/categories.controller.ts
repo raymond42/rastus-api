@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -33,18 +34,21 @@ export class CategoriesController {
   }
 
   @Permissions('categories:create')
+  @AuditLog('category')
   @Post()
   create(@Body() dto: CreateCategoryDto) {
     return this.categoriesService.create(dto);
   }
 
   @Permissions('categories:update')
+  @AuditLog('category')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
     return this.categoriesService.update(id, dto);
   }
 
   @Permissions('categories:delete')
+  @AuditLog('category')
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {

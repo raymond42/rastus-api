@@ -57,8 +57,22 @@ export class InventoryService {
     return { data, meta: buildPaginationMeta(page, limit, total) };
   }
 
-  async adjust(variantId: string, dto: AdjustInventoryDto, userId?: string) {
-    const inventory = await this.prisma.inventory.findUnique({
+  /**
+   * Adjusts stock for a variant and writes the paired InventoryTransaction
+   * atomically. Pass `tx` (an interactive-transaction client) when this
+   * needs to be composed as part of a larger caller-owned transaction
+   * (e.g. OrdersService.create decrementing stock alongside order
+   * creation) — otherwise it wraps itself in its own `$transaction`.
+   */
+  async adjust(
+    variantId: string,
+    dto: AdjustInventoryDto,
+    userId?: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = tx ?? this.prisma;
+
+    const inventory = await client.inventory.findUnique({
       where: { variantId },
     });
 
@@ -73,21 +87,30 @@ export class InventoryService {
       throw new BadRequestException('Insufficient stock');
     }
 
+    const transactionData = {
+      variantId,
+      changeQty: dto.changeQty,
+      type: dto.type,
+      reason: dto.reason,
+      referenceId: dto.referenceId,
+      createdBy: userId,
+    };
+
+    if (tx) {
+      const updatedInventory = await tx.inventory.update({
+        where: { variantId },
+        data: { quantityOnHand: newQuantity },
+      });
+      await tx.inventoryTransaction.create({ data: transactionData });
+      return updatedInventory;
+    }
+
     const [updatedInventory] = await this.prisma.$transaction([
       this.prisma.inventory.update({
         where: { variantId },
         data: { quantityOnHand: newQuantity },
       }),
-      this.prisma.inventoryTransaction.create({
-        data: {
-          variantId,
-          changeQty: dto.changeQty,
-          type: dto.type,
-          reason: dto.reason,
-          referenceId: dto.referenceId,
-          createdBy: userId,
-        },
-      }),
+      this.prisma.inventoryTransaction.create({ data: transactionData }),
     ]);
 
     return updatedInventory;
