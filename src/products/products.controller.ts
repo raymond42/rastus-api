@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { AuditLog } from '../audit-logs/decorators/audit-log.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { AuthenticatedUser } from '../common/types/authenticated-user.interface';
@@ -39,6 +40,7 @@ export class ProductsController {
   }
 
   @Permissions('products:create')
+  @AuditLog('product')
   @Post()
   create(
     @Body() dto: CreateProductDto,
@@ -55,6 +57,7 @@ export class ProductsController {
   }
 
   @Permissions('products:update')
+  @AuditLog('product')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.productsService.update(id, dto);
@@ -62,12 +65,14 @@ export class ProductsController {
 
   // Per the TRD, DELETE archives the product rather than hard-deleting it.
   @Permissions('products:delete')
+  @AuditLog('product')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
 
   @Permissions('products:update')
+  @AuditLog('productVariant')
   @Post(':id/variants')
   addVariant(
     @Param('id') productId: string,
@@ -77,6 +82,7 @@ export class ProductsController {
   }
 
   @Permissions('products:update')
+  @AuditLog('productVariant', { idParam: 'variantId' })
   @Patch(':id/variants/:variantId')
   updateVariant(
     @Param('id') productId: string,
@@ -87,6 +93,7 @@ export class ProductsController {
   }
 
   @Permissions('products:delete')
+  @AuditLog('productVariant', { idParam: 'variantId' })
   @Delete(':id/variants/:variantId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeVariant(
@@ -97,12 +104,14 @@ export class ProductsController {
   }
 
   @Permissions('products:update')
+  @AuditLog('productImage')
   @Post(':id/images')
   addImage(@Param('id') productId: string, @Body() dto: CreateProductImageDto) {
     return this.productsService.addImage(productId, dto);
   }
 
   @Permissions('products:update')
+  @AuditLog('productImage', { idParam: 'imageId' })
   @Delete(':id/images/:imageId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeImage(

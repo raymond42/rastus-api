@@ -24,8 +24,11 @@ const ROLES: Array<{ name: string; permissions: Record<string, string[]> }> =
         categories: ['create', 'read', 'update', 'delete'],
         products: ['create', 'read', 'update', 'delete'],
         inventory: ['read', 'update'],
-        orders: ['read', 'update'],
+        // "create" covers admin-placed orders (TRD §9: "customer/admin
+        // places an order"), not just viewing/updating existing ones.
+        orders: ['create', 'read', 'update'],
         payments: ['read'],
+        'custom-designs': ['read'],
       },
     },
     {
