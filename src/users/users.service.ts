@@ -1,16 +1,19 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
+import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   buildPaginationMeta,
   PaginatedResult,
 } from '../common/types/paginated-result.interface';
 import { CreateUserDto } from './dto/create-user.dto';
+import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { QueryUserDto } from './dto/query-user.dto';
@@ -20,7 +23,10 @@ const USER_OMIT = { passwordHash: true } satisfies Prisma.UserOmit;
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+  ) {}
 
   async findAll(query: QueryUserDto): Promise<PaginatedResult<unknown>> {
     const page = query.page ?? 1;
@@ -99,6 +105,37 @@ export class UsersService {
       include: { role: true },
       omit: USER_OMIT,
     });
+  }
+
+  /**
+   * Creates an inert staff account (no password) and issues a staff-invite
+   * token. The account can't log in — `AuthService.validateUser` rejects
+   * users with no `passwordHash` — until the invitee calls
+   * `POST /auth/accept-invite`.
+   */
+  async invite(dto: InviteUserDto) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `A user with email ${dto.email} already exists`,
+      );
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        roleId: dto.roleId,
+        isStaff: true,
+      },
+      include: { role: true },
+      omit: USER_OMIT,
+    });
+
+    await this.authService.issueStaffInviteToken(user.id, user.email);
+
+    return user;
   }
 
   async updateRole(id: string, dto: UpdateUserRoleDto, currentUserId: string) {

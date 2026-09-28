@@ -69,6 +69,11 @@ enum AuditAction {
   DELETE
 }
 
+enum AuthTokenPurpose {
+  PASSWORD_RESET
+  STAFF_INVITE
+}
+
 // ---------------------------------------------------------------------------
 // Roles & Users
 // ---------------------------------------------------------------------------
@@ -104,6 +109,7 @@ model User {
   orders                Order[]
   customDesigns         CustomDesign[]
   refreshTokens         RefreshToken[]
+  authTokens            AuthToken[]
   auditLogs             AuditLog[]             @relation("AuditLogAdminUser")
 
   @@map("users")
@@ -121,6 +127,21 @@ model RefreshToken {
 
   @@index([userId], map: "idx_refresh_tokens_user")
   @@map("refresh_tokens")
+}
+
+model AuthToken {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  purpose   AuthTokenPurpose
+  tokenHash String           @map("token_hash")
+  expiresAt DateTime         @map("expires_at")
+  usedAt    DateTime?        @map("used_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_auth_tokens_user")
+  @@map("auth_tokens")
 }
 
 // ---------------------------------------------------------------------------

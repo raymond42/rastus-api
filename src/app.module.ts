@@ -14,6 +14,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuditLogInterceptor } from './audit-logs/interceptors/audit-log.interceptor';
@@ -37,6 +38,7 @@ import { AuditLogInterceptor } from './audit-logs/interceptors/audit-log.interce
     OrdersModule,
     PaymentsModule,
     AuditLogsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [

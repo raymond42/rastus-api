@@ -13,6 +13,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { AuthenticatedUser } from '../common/types/authenticated-user.interface';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { QueryUserDto } from './dto/query-user.dto';
@@ -38,6 +39,13 @@ export class UsersController {
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
+  }
+
+  @Permissions('users:create')
+  @AuditLog('user')
+  @Post('invite')
+  invite(@Body() dto: InviteUserDto) {
+    return this.usersService.invite(dto);
   }
 
   @Permissions('users:update')

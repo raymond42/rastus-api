@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -9,10 +9,15 @@ import {
   RefreshTokenPayload,
   TokenPair,
 } from './types/jwt-payload.interface';
-import { User } from '@prisma/client';
+import { AuthTokenPurpose, User } from '@prisma/client';
+
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const STAFF_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -95,6 +100,141 @@ export class AuthService {
         data: { revokedAt: new Date() },
       });
     }
+  }
+
+  /**
+   * Issues a password-reset token for the given email if (and only if) an
+   * active account exists. Always resolves with the same generic message so
+   * the endpoint doesn't leak which emails are registered.
+   *
+   * No email provider is wired up yet — the raw token is logged so it can be
+   * exchanged manually with `resetPassword` in the meantime.
+   */
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (user && user.status === 'ACTIVE') {
+      const rawToken = await this.issueAuthToken(
+        user.id,
+        AuthTokenPurpose.PASSWORD_RESET,
+        PASSWORD_RESET_TTL_MS,
+      );
+      this.logger.warn(
+        `[stub email] Password reset for ${email} — token: ${rawToken} ` +
+          `(POST /auth/reset-password, expires in 30m)`,
+      );
+    }
+
+    return {
+      message:
+        'If that email is registered, a password reset link has been sent.',
+    };
+  }
+
+  /** Consumes a password-reset token, sets the new password, and revokes existing sessions. */
+  async resetPassword(token: string, password: string): Promise<TokenPair> {
+    const user = await this.consumeAuthToken(
+      token,
+      AuthTokenPurpose.PASSWORD_RESET,
+    );
+    return this.setPasswordAndReauth(user, password);
+  }
+
+  /** Consumes a staff-invite token, sets the initial password, and logs the new staff member in. */
+  async acceptInvite(token: string, password: string): Promise<TokenPair> {
+    const user = await this.consumeAuthToken(
+      token,
+      AuthTokenPurpose.STAFF_INVITE,
+    );
+    return this.setPasswordAndReauth(user, password);
+  }
+
+  /**
+   * Creates a staff-invite `AuthToken` for an already-created user. Called by
+   * `UsersService.invite` right after the inert (no-password) user row is
+   * created. Logged in place of a real email send.
+   */
+  async issueStaffInviteToken(userId: string, email: string): Promise<void> {
+    const rawToken = await this.issueAuthToken(
+      userId,
+      AuthTokenPurpose.STAFF_INVITE,
+      STAFF_INVITE_TTL_MS,
+    );
+    this.logger.warn(
+      `[stub email] Staff invite for ${email} — token: ${rawToken} ` +
+        `(POST /auth/accept-invite, expires in 7d)`,
+    );
+  }
+
+  private async setPasswordAndReauth(
+    user: User,
+    password: string,
+  ): Promise<TokenPair> {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // Revoke every existing refresh token so old sessions can't outlive a
+    // credential change.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    return this.issueTokenPair(updated);
+  }
+
+  private async issueAuthToken(
+    userId: string,
+    purpose: AuthTokenPurpose,
+    ttlMs: number,
+  ): Promise<string> {
+    const rawToken = randomUUID();
+    await this.prisma.authToken.create({
+      data: {
+        userId,
+        purpose,
+        tokenHash: this.hashToken(rawToken),
+        expiresAt: new Date(Date.now() + ttlMs),
+      },
+    });
+    return rawToken;
+  }
+
+  private async consumeAuthToken(
+    rawToken: string,
+    purpose: AuthTokenPurpose,
+  ): Promise<User> {
+    const tokenHash = this.hashToken(rawToken);
+    const authToken = await this.prisma.authToken.findFirst({
+      where: {
+        tokenHash,
+        purpose,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!authToken) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: authToken.userId },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    await this.prisma.authToken.update({
+      where: { id: authToken.id },
+      data: { usedAt: new Date() },
+    });
+
+    return user;
   }
 
   private async issueTokenPair(user: User): Promise<TokenPair> {

@@ -29,6 +29,7 @@ const ROLES: Array<{ name: string; permissions: Record<string, string[]> }> =
         orders: ['create', 'read', 'update'],
         payments: ['read'],
         'custom-designs': ['read'],
+        dashboard: ['read'],
       },
     },
     {
@@ -36,6 +37,7 @@ const ROLES: Array<{ name: string; permissions: Record<string, string[]> }> =
       permissions: {
         products: ['read'],
         inventory: ['create', 'read', 'update'],
+        dashboard: ['read'],
       },
     },
     {
@@ -46,6 +48,7 @@ const ROLES: Array<{ name: string; permissions: Record<string, string[]> }> =
         orders: ['read'],
         payments: ['read'],
         'custom-designs': ['read'],
+        dashboard: ['read'],
       },
     },
   ];
